@@ -1,0 +1,56 @@
+services:
+  db:
+    image: postgres:15
+    container_name: kos_db
+    environment:
+      POSTGRES_USER: user_kos
+      POSTGRES_PASSWORD: password_kos
+      POSTGRES_DB: db_kos
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/schema.sql
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user_kos -d db_kos"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  backend:
+    build: ./backend
+    container_name: kos_backend
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DB_HOST: db
+      DB_USER: user_kos
+      DB_PASS: password_kos
+      DB_NAME: db_kos
+      DB_PORT: 5432
+      DB_INIT_MAX_ATTEMPTS: 20
+      DB_INIT_RETRY_DELAY_MS: 3000
+      JWT_SECRET: supersecret_key_99
+      PORT: 3000
+      CORS_ORIGIN: http://localhost:3001
+    ports:
+      - "3000:3000"
+
+  frontend:
+    build: ./frontend
+    container_name: kos_frontend
+    environment:
+      REACT_APP_API_URL: auto
+      HOST: 0.0.0.0
+      PORT: 3000
+      WDS_SOCKET_PORT: 0
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    stdin_open: true
+    tty: true
+
+volumes:
+  postgres_data:
